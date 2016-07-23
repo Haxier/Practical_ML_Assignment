@@ -2,7 +2,7 @@
 title: "Machine Learning Assignment"
 author: "Asier Goikoetxea"
 date: "20 de julio de 2016"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
