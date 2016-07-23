@@ -1,0 +1,111 @@
+---
+title: "Machine Learning Assignment"
+author: "Asier Goikoetxea"
+date: "20 de julio de 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har
+
+First of all, we are going to start by loading the required packages and the reading the data.
+Since training data is also quite big, we are going to split it again to create a validation dataset that will be very usefull for cross-validation analyzing the accuracy and other variables of the different Machine Learning Methods before we create our final model and use it in the Test dataset.
+
+```{r}
+#Load packages and read the data
+library(caret)
+library(randomForest)
+train_data <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+```
+
+## Exploratory Analysis and Preprocessing
+
+Looking at the dimmension of the training set, we can see it has 15699 observations and 160 variables. Our goal is to create the best model to predict the "classe" variable.
+
+```{r}
+#overall structure of the data and somre plots
+ dim(train_data)
+#variable names
+ names(train_data)
+```
+
+However, first we will preprocess de data to improve the performance of our analysis. 
+We start by removing the columns that contain NA values and also removing some unnecessary variables like: X, user name, timestamp and new_window.
+
+```{r}
+# remove columns with NA values
+slim_training <- train_data[,!sapply(train_data,function(x) any(is.na(x)))]
+
+# remove useless variables
+del_log <- grepl("X|user_name|timestamp|new_window", colnames(slim_training))
+slim_training <- slim_training[, !del_log]
+```
+
+Next we will perform a Near Zero Variance analysis to the data to identify the variables that don't add information because they have almost no variance and remove this variables.
+
+```{r}
+# remove zero variance variables
+nzv <- nearZeroVar(slim_training, saveMetrics = TRUE)
+slim_training <- slim_training[, !nzv$nzv]
+dim(slim_training)
+```
+
+With this preprocessing methods we have reduced the variables to 54.
+
+## Model Fitting
+
+First we are going to create a data partition to have a training and Validation set to perform cross validation analysis before we use our model with the test dataset.
+
+```{r}
+#Create data partition to have a validation dataset
+set.seed(2233)
+inTrain <- createDataPartition(slim_training$classe, p=0.7, list = FALSE)
+training <- slim_training[inTrain, ]
+validation <- slim_training[-inTrain, ]
+```
+
+We will fit a random forest model and analyze the model using the validation set and the confussionMatrix function. We will use the randomForest function directly instead of caret package to improve speed.
+
+```{r}
+#create a few training models: random forests, boosting, lda...
+
+forest_model <- randomForest(classe~., data=training, importance=TRUE, ntree=100)
+forest_pred <- predict(forest_model, validation)
+confusionMatrix(forest_pred, validation$classe)
+```
+
+With the random forest model, we get a 0.9971 accuracy in the validation dataset. The 95% confidence intervals are 0.9954 and 0.9983
+
+We will also fit a General Boosted Method "GBM" and repeat the process to compare the two models.
+
+```{r}
+#create a few training models: random forests, boosting, lda...
+
+gbm_model <- train(classe~., data= training, method="gbm", verbose=FALSE)
+
+#create predictions using validation dataset
+gbm_pred <- predict(gbm_model, validation)
+
+```
+
+```{r}
+confusionMatrix(gbm_pred, validation$classe)
+```
+
+Using GBM we get a 0.9861 accuracy in the validation dataset. The 95% confidence intervals are 0.9827 and 0.9889
+So comparing the two models, the random forest method has the best results.
+
+## Conclusions
+
+To end the assignment, we will test our model with the test dataset to see the results.
+
+```{r}
+final_predictions <- predict(forest_model, testing)
+final_predictions
+```
+
